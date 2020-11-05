@@ -1,0 +1,313 @@
+Event Notification Service In Salesforce Marketing Cloud Using Cloud Page as Callback URL
+In my last article, we have seen How to Trigger Transactional Messaging Email from Cloud Page using SSJS. In this blog we will see how to receive notifications for the transactional email we sent or when a customer opens or clicked an email.
+
+
+What is Event Notification Service (ENS) ?
+
+Event Notification Service (ENS) is a feature where any system (Marketing Cloud / any external applications that support webhook / callback URL ) receive notification when certain events occur in Salesforce Marketing Cloud Transactional Email and SMS.
+
+
+Let's say when a customer provides an invalid email address for password reset then ENS identifies that email is invalid in near real time and sends a notification based on that you can try to send SMS to reset the password.
+
+
+Step 1: Create an API Installed package:
+
+In Installed Packages, create an API integration to get a client ID and client secret. Use the following permissions settings for the API integration.
+
+Data Extensions - Read, Write
+
+Tracking Events - Read
+
+Event Notifications: Callbacks - Read, Create, Update, Delete
+
+Event Notifications: Subscriptions - Read, Create, Update, Delete
+
+Provisioning: Accounts - Read, Write
+
+Provisioning: OTT Channels - Read, Write
+
+Step 2: Create a Data extension to store the Call Back Response
+
+Let's call the data extension and the external key as "Transactional_Event_Notification_CallBack_Verification". 
+
+
+Data Extension To Store the Call Back ResponseData Extension To Store the Call Back Response
+Data Extension To Store the Call Back Response
+Step 3: Create a code snippet to get the Call Back Response.
+
+Go to Content Builder > Create a code snippet and add the below code (view code snippet): 
+
+
+
+Platform.Request.GetPostData(0) function is used to get the post data and returns the whole response body in a string which is undocumented in SFMC document but it has been neatly explained by Lukas in this Stack Exchange post.
+
+
+Step 4: Create a Cloud Page Code Resource: 
+
+Go to Web Studio > Cloud Pages > Choose / Create collection > Click create > Code Page Resource > give a name for it > Select the resource as javascript (JS).
+
+Copy the content block ID which you have created in Step 3 and paste it with the code below, add it in Cloud page and publish it.
+
+%%=ContentBlockbyId("36248")=%%
+
+Step 5: Register a Call Back URL / Webhook:
+
+We will be using the Cloud Page URL which you have created in Step 4 in the body of the API.
+
+
+Below is the URL and Header to register a call back.
+
+POST URL - https://xxxxx.rest.marketingcloudapis.com/platform/v1/ens-callbacks 
+Header:
+Content-Type - application/json
+Authorization - Bearer 'Access Token'
+Register a Call Back URLRegister a Call Back URL
+Register a Call Back URL
+Note: 
+
+Cloudpage URL must be online and reachable before you create a callback.
+
+Do not add URL port or query parameters in the URL. 
+
+
+Step 6: Verify the Call Back URL:
+
+Go to the data extension 'Transactional_Event_Notification_CallBack_Verification' now you can see a record with the Response for Call Back like below:
+
+
+
+Copy the callback id and verification key from the data extension and use it to verify the call back.
+
+
+Below is the URL and Header to verify the callback. You should get 200 as a status response.
+
+POST URL - https://xxxxx.rest.marketingcloudapis.com/platform/v1/ens-verify 
+Header:
+Content-Type - application/json
+Authorization - Bearer 'Access Token'
+
+Verify the Call Back URLVerify the Call Back URL
+Verify the Call Back URL
+Step 7: Create a Subscription
+
+Below is the URL and Header to create a subscription.
+
+POST URL - https://xxxxx.rest.marketingcloudapis.com/platform/v1/ens-subscriptions 
+Header:
+Content-Type - application/json
+Authorization - Bearer 'Access Token'
+Create SubscriptionCreate Subscription
+Create Subscription
+Note:
+
+Use the same callback id which you have already verified.
+
+Provide a unique subscription name to create a subscription.
+
+You can find the list of available notification events here to input it in the event category types.
+
+You can create upto 200 subscriptions for a single verified callback.
+
+You can also add subscription filters in the payload. For example you can add something like "definitionKey=Test_Transactional_Message_V2" to get the notification only from a particular definition.  But if you add it then you can't able to get notification for email opens & clicks. So, you would need to create a new subscription for the same callback with event type as Email opens & clicks.
+
+
+Step 8: Create a new data extension to store the ENS response.
+
+Let's call this data extension as 'Transactional_Event_Notification_Service'.
+
+I have used many attributes for different events and you can see it gallery view. Please feel free to change as per your convenience.
+
+
+
+untitled image
+untitled image
+untitled image
+untitled image
+
+
+Step 9: Create a code snippet to get event notifications in data extensions
+
+Go to Content Builder > Create a code snippet and add the below code (view code snippet): 
+
+
+Update the same Cloud page with this new content block id to get the notification to this data extension.
+
+
+Decoding the Code:
+
+Row 4 - Platform.Request.GetPostData(0) function is used to get the post data and returns the whole response body in a string.
+
+Row 5 - Platform.Function.ParseJSON(jsonpost)  function parses the input string into an object from that value.
+
+Row 23 - converting the Unix timestamp which is string data type to date time field.
+
+Row 24 - Platform.Function.InsertData function is used to add rows in the specified data extension.
+
+Composite ID in Email sent event type is a combination of definition id, job id, list id,batch id and subscriber id. Composite ID in Email open and click event type is a combination of job id, list id,batch id and subscriber id. 
+ 
+
+Additional Info:
+
+You can add your own customized logic on top of each event block in the above code.
+
+
+For example:
+
+If the event category type is Email not sent then you can add your logic in the Email not sent block to fire a journey builder API event and send an email notification to the account manager or a team which handles invalid emails.
+
+If the Email is bounced you can also call CreateSalesforceObject() to create a task or add record and notify Salesforce CRM users.
+
+
+Demo:
+
+
+Now, all the setup has been done. Try to hit the Transactional API via any API tool or you can use my previous article to set up transactional messaging in the cloud page and send an email.
+
+
+Once you have triggered an email with a transactional API, the email comes like in next 2 to 3 seconds in your inbox and the event notification for email sent will appear in the data extension within 5 seconds! It is almost the same timing you will receive a notification when you open or click an email. Isn't it cool! 
+
+
+Below are the screenshots for each email events for reference:
+
+
+
+untitled image
+untitled image
+untitled image
+untitled image
+untitled image
+
+
+Hope this gives you an idea of how to implement event notification service in Marketing cloud.
+
+
+Please feel free to leave your feedback / queries in the comments sections.
+
+
+Happy Learning!
+
+
+Capture-Register-Call-Back-URL-Response.js
+
+
+<script runat="server">
+Platform.Load("Core","1");
+try{
+    var jsonpost = Platform.Request.GetPostData(0);
+    var json = Platform.Function.ParseJSON(jsonpost);
+	var Message = "Call back";
+    var insertResponse = Platform.Function.InsertData("Transactional_Event_Notification_CallBack_Verification",["Message","Body"],[Message,jsonpost]);
+} catch (e) {
+  Write("<br>" + Stringify(e))
+}
+</script>
+
+
+
+
+Event-Notification-Service-Using-Cloudpage-URL.js
+
+<script runat="server">
+Platform.Load("Core","1");
+try{
+var jsonpost = Platform.Request.GetPostData(0);
+var json = Platform.Function.ParseJSON(jsonpost);
+var messageKey = json[0].eventCategoryType;
+
+	if (messageKey == "TransactionalSendEvents.EmailSent") {
+		var MessageType = json[0].eventCategoryType;
+		var jobId = json[0].composite.jobId;
+		var batchId = json[0].composite.batchId;
+		var listId = json[0].composite.listId;
+		var subscriberId = json[0].composite.subscriberId;
+		var emailId = json[0].composite.emailId;
+		var definitionKey = json[0].definitionKey;
+		var mid = json[0].mid;
+		var eid = json[0].eid;
+		var Email = json[0].info.to;
+		var subscriberKey = json[0].info.subscriberKey;
+		var definitionId = json[0].definitionId;
+		var compositeId = json[0].compositeId;
+		var timestampUTC = json[0].timestampUTC;
+		timestampUTC = new Date(timestampUTC);
+		var insertResponse = Platform.Function.InsertData("Transactional_Event_Notification_Service",["MessageType","jobId","batchId","listId","subscriberId","emailId","definitionKey","mid","eid","Email","subscriberKey","definitionId","compositeId","timestampUTC"],[MessageType,jobId,batchId,listId,subscriberId,emailId,definitionKey,mid,eid,Email,subscriberKey,definitionId,compositeId,timestampUTC]);
+	}
+	else if (messageKey == "TransactionalSendEvents.EmailNotSent"){
+		var MessageType = json[0].eventCategoryType;
+		var compositeId = json[0].compositeId;
+		var definitionKey = json[0].definitionKey;
+		var definitionId = json[0].definitionId;
+		var mid = json[0].mid;
+		var eid = json[0].eid;
+		var Email = json[0].info.to;
+		var subscriberKey = json[0].info.subscriberKey;
+		var EmailNotSentReason = json[0].info.reason;
+		var EmailNotSentStatusCode = json[0].info.statusCode;
+		var EmailNotSentStatusMessage = json[0].info.statusMessage;
+		var timestampUTC = json[0].timestampUTC;
+		timestampUTC = new Date (timestampUTC);
+		var insertResponse = Platform.Function.InsertData("Transactional_Event_Notification_Service",["MessageType","compositeId","definitionKey","definitionId","mid","eid","Email","mid","eid","Email","subscriberKey","EmailNotSentReason","EmailNotSentStatusCode","EmailNotSentStatusMessage","timestampUTC"],[MessageType,compositeId,definitionKey,definitionId,mid,eid,Email,mid,eid,Email,subscriberKey,EmailNotSentReason,EmailNotSentStatusCode,EmailNotSentStatusMessage,timestampUTC]);
+	}
+	else if (messageKey == "TransactionalSendEvents.EmailBounced"){
+		var MessageType = json[0].eventCategoryType;
+		var compositeId = json[0].compositeId;
+		var definitionKey = json[0].definitionKey;
+		var definitionId = json[0].definitionId;
+		var mid = json[0].mid;
+		var eid = json[0].eid;
+		var Email = json[0].info.to;
+		var subscriberKey = json[0].info.subscriberKey;
+		var bounceCode = json[0].info.bounceCode;
+		var bounceMessage = json[0].info.bounceMessage;
+		var smtpReason = json[0].info.smtpReason;
+		var timestampUTC = json[0].timestampUTC;
+		timestampUTC = new Date (timestampUTC);
+		var insertResponse = Platform.Function.InsertData("Transactional_Event_Notification_Service",["MessageType","compositeId","definitionKey","definitionId","mid","eid","Email","mid","eid","Email","subscriberKey","bounceCode","bounceMessage","smtpReason","timestampUTC"],[MessageType,compositeId,definitionKey,definitionId,mid,eid,Email,mid,eid,Email,subscriberKey,bounceCode,bounceMessage,smtpReason,timestampUTC]);
+	}
+	else if (messageKey == "EngagementEvents.EmailOpen"){
+		var MessageType = json[0].eventCategoryType;
+		var jobId = json[0].composite.jobId;
+		var batchId = json[0].composite.batchId;
+		var listId = json[0].composite.listId;
+		var subscriberId = json[0].composite.subscriberId;
+		var definitionKey = json[0].definitionKey;
+		var mid = json[0].mid;
+		var eid = json[0].eid;
+		var definitionId = json[0].definitionId;
+		var compositeId = json[0].compositeId;
+		var ipAddress = json[0].info.ipAddress;
+		var userAgent = json[0].info.userAgent;
+		var country = json[0].info.location.country;
+		var region = json[0].info.location.region;
+		var city = json[0].info.location.city;
+		var postalCode = json[0].info.location.postalCode;
+		var latitude = json[0].info.location.latitude;
+		var longitude = json[0].info.location.longitude;
+		var timestampUTC = json[0].timestampUTC;
+		timestampUTC = new Date (timestampUTC);
+		var insertResponse = Platform.Function.InsertData("Transactional_Event_Notification_Service",["MessageType","jobId","batchId","listId","subscriberId","definitionKey","mid","eid","definitionId","compositeId","ipAddress","userAgent","country","region","city","postalCode","latitude","longitude","timestampUTC"],[MessageType,jobId,batchId,listId,subscriberId,definitionKey,mid,eid,definitionId,compositeId,ipAddress,userAgent,country,region,city,postalCode,latitude,longitude,timestampUTC]);
+	}
+	else if (messageKey == "EngagementEvents.EmailClick"){
+		var MessageType = json[0].eventCategoryType;
+		var jobId = json[0].composite.jobId;
+		var batchId = json[0].composite.batchId;
+		var listId = json[0].composite.listId;
+		var subscriberId = json[0].composite.subscriberId;
+		var definitionKey = json[0].definitionKey;
+		var mid = json[0].mid;
+		var eid = json[0].eid;
+		var definitionId = json[0].definitionId;
+		var compositeId = json[0].compositeId;
+		var jobUrlId = json[0].info.jobUrlId;
+		var contentLink = json[0].info.contentLink;
+		var timestampUTC = json[0].timestampUTC;
+		timestampUTC = new Date (timestampUTC);
+		var insertResponse = Platform.Function.InsertData("Transactional_Event_Notification_Service",["MessageType","jobId","batchId","listId","subscriberId","definitionKey","mid","eid","definitionId","compositeId","jobUrlId","contentLink","timestampUTC"],[MessageType,jobId,batchId,listId,subscriberId,definitionKey,mid,eid,definitionId,compositeId,jobUrlId,contentLink,timestampUTC]);
+	}
+
+Write('{"Status":"Success"}');
+} catch (e) {
+Write("<br>" + Stringify(e))
+}
+</script>
+
